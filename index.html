@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="manifest" href="/manifest.json">
+<title>HIIT Timer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+
+/* ── Views ── */
+.view{display:none;height:100%;flex-direction:column;overflow:hidden}
+.view.active{display:flex}
+
+/* ── Home ── */
+#home-view{background:#0d0d0d}
+.home-header{background:#1a0000;padding:16px 20px;display:flex;
+  align-items:center;justify-content:space-between;flex-shrink:0}
+.home-header h1{font-size:22px;font-weight:900;color:#ff4444;letter-spacing:1px}
+.home-header span{font-size:12px;color:#555}
+.workout-list{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px;color:#444;padding:40px;text-align:center}
+.empty-state .ei{font-size:56px}
+.empty-state p{font-size:15px;line-height:1.5}
+.workout-card{background:#1a1a1a;border-radius:14px;padding:16px;
+  border-left:4px solid #ff4444;display:flex;align-items:center;gap:12px}
+.wc-info{flex:1;min-width:0}
+.wc-info h3{font-size:18px;font-weight:700;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.wc-info p{font-size:12px;color:#666;margin-top:3px}
+.wc-actions{display:flex;gap:8px;flex-shrink:0}
+.fab{position:fixed;bottom:24px;right:24px;background:#ff4444;color:#fff;
+  border:none;border-radius:50%;width:64px;height:64px;font-size:32px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  box-shadow:0 4px 20px rgba(255,68,68,.5);touch-action:manipulation}
+
+/* ── Buttons ── */
+.btn{border:none;border-radius:10px;padding:10px 18px;font-size:14px;
+  font-weight:700;cursor:pointer;touch-action:manipulation;transition:opacity .15s}
+.btn:active{opacity:.7}
+.btn-primary{background:#ff4444;color:#fff}
+.btn-secondary{background:#2a2a2a;color:#aaa}
+.btn-danger{background:#2a0a0a;color:#ff6666;border:1px solid #441111}
+.btn-icon{padding:9px 13px;font-size:18px;line-height:1}
+
+/* ── Edit ── */
+#edit-view{background:#0d0d0d}
+.edit-header{background:#1a0000;padding:14px 16px;display:flex;
+  align-items:center;gap:12px;flex-shrink:0}
+.back-btn{background:none;border:none;color:#ff4444;font-size:26px;
+  cursor:pointer;padding:2px 6px;line-height:1}
+.edit-header h2{font-size:18px;font-weight:700;color:#ff4444}
+.edit-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:18px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+.form-group input[type=text],
+.form-group input[type=number]{background:#1a1a1a;border:1px solid #333;border-radius:10px;
+  color:#f0f0f0;font-size:20px;padding:12px 14px;width:100%;outline:none}
+.form-group input:focus{border-color:#ff4444}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-hint{font-size:11px;color:#555;margin-top:2px}
+.summary-box{background:#1a1a1a;border-radius:10px;padding:14px;
+  font-size:13px;color:#888;line-height:1.7}
+.edit-footer{padding:16px;display:flex;gap:12px;border-top:1px solid #1a1a1a;flex-shrink:0}
+.edit-footer .btn{flex:1;padding:15px;font-size:16px}
+
+/* ── Timer ── */
+#timer-view{position:relative}
+.timer-bg{position:absolute;inset:0;transition:background .6s;z-index:0}
+.timer-content{position:relative;z-index:1;display:flex;flex-direction:column;height:100%}
+.timer-topbar{padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+.timer-wname{font-size:13px;color:rgba(255,255,255,.4);font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.stop-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  border-radius:8px;color:rgba(255,255,255,.6);font-size:13px;padding:7px 16px;
+  cursor:pointer;touch-action:manipulation}
+.stop-btn:active{background:rgba(255,0,0,.2)}
+
+.timer-main{flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;padding:10px 20px}
+.t-phase{font-size:13px;font-weight:800;letter-spacing:3px;
+  text-transform:uppercase;color:rgba(255,255,255,.5)}
+.t-round{font-size:15px;color:rgba(255,255,255,.35);min-height:20px}
+.ring-wrap{position:relative;display:flex;align-items:center;justify-content:center;
+  width:240px;height:240px}
+.ring-wrap svg{position:absolute;inset:0;width:100%;height:100%}
+#ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:10}
+#ring-fg{fill:none;stroke-width:10;stroke-linecap:round;
+  transition:stroke-dashoffset .95s linear,stroke .5s}
+.t-countdown{font-size:88px;font-weight:900;font-variant-numeric:tabular-nums;
+  line-height:1;letter-spacing:-2px;color:#fff}
+.t-next{font-size:12px;color:rgba(255,255,255,.3);min-height:16px;
+  text-align:center;letter-spacing:.5px}
+
+.round-dots{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;
+  max-width:280px;padding:4px 0}
+.rd{width:13px;height:13px;border-radius:50%;background:rgba(255,255,255,.12);
+  transition:all .3s;flex-shrink:0}
+.rd.done{background:rgba(255,255,255,.5)}
+.rd.active{background:#fff;box-shadow:0 0 8px rgba(255,255,255,.6)}
+
+.timer-controls{padding:24px 20px 32px;display:flex;align-items:center;
+  justify-content:center;gap:28px;flex-shrink:0}
+.btn-pause{width:80px;height:80px;border-radius:50%;border:none;font-size:30px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;touch-action:manipulation;transition:all .2s}
+.btn-pause:active{transform:scale(.93)}
+.btn-skip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  border-radius:50%;width:52px;height:52px;font-size:20px;color:rgba(255,255,255,.5);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;touch-action:manipulation}
+.btn-skip:active{background:rgba(255,255,255,.15)}
+
+/* ── Done ── */
+.done-overlay{position:absolute;inset:0;background:#0d0d0d;z-index:10;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;padding:40px;text-align:center}
+.done-overlay .di{font-size:72px}
+.done-overlay h2{font-size:34px;font-weight:900;color:#ffcc44}
+.done-overlay p{font-size:16px;color:#666;line-height:1.6}
+.done-overlay .btn{margin-top:8px;padding:16px 40px;font-size:17px}
+</style>
+</head>
+<body>
+
+<!-- ══ HOME ══════════════════════════════════════════════════════════════ -->
+<div id="home-view" class="view active">
+  <div class="home-header">
+    <h1>⚡ HIIT Timer</h1>
+    <span>Boxing · Sprints · HIIT</span>
+  </div>
+  <div class="workout-list" id="workout-list">
+    <div class="empty-state" id="empty-state">
+      <div class="ei">🥊</div>
+      <p>No workouts yet.<br>Tap <strong>+</strong> to create your first.</p>
+    </div>
+  </div>
+  <button class="fab" onclick="showEdit(null)" aria-label="New workout">+</button>
+</div>
+
+<!-- ══ EDIT ══════════════════════════════════════════════════════════════ -->
+<div id="edit-view" class="view">
+  <div class="edit-header">
+    <button class="back-btn" onclick="showHome()">‹</button>
+    <h2 id="edit-title">New Workout</h2>
+  </div>
+  <div class="edit-body">
+    <input type="hidden" id="edit-id">
+    <div class="form-group">
+      <label>Workout Name</label>
+      <input type="text" id="edit-name" placeholder="e.g. Boxing Rounds" maxlength="30">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Warmup (sec)</label>
+        <input type="number" id="edit-warmup" min="0" max="600" value="60">
+        <span class="form-hint">0 to skip</span>
+      </div>
+      <div class="form-group">
+        <label>Rounds</label>
+        <input type="number" id="edit-rounds" min="1" max="99" value="8">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Round Duration (sec)</label>
+        <input type="number" id="edit-rounddur" min="5" max="3600" value="180">
+        <span class="form-hint">180 = 3 min</span>
+      </div>
+      <div class="form-group">
+        <label>Rest (sec)</label>
+        <input type="number" id="edit-rest" min="0" max="600" value="60">
+        <span class="form-hint">0 = no rest</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Summary</label>
+      <div class="summary-box" id="edit-summary">—</div>
+    </div>
+  </div>
+  <div class="edit-footer">
+    <button class="btn btn-secondary" onclick="showHome()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveWorkout()">Save Workout</button>
+  </div>
+</div>
+
+<!-- ══ TIMER ═════════════════════════════════════════════════════════════ -->
+<div id="timer-view" class="view">
+  <div class="timer-bg" id="timer-bg"></div>
+  <div class="timer-content">
+    <div class="timer-topbar">
+      <span class="timer-wname" id="t-name"></span>
+      <button class="stop-btn" onclick="confirmStop()">■ Stop</button>
+    </div>
+    <div class="timer-main">
+      <div class="t-phase" id="t-phase">WARM UP</div>
+      <div class="t-round" id="t-round"></div>
+      <div class="ring-wrap">
+        <svg viewBox="0 0 240 240">
+          <circle id="ring-bg" cx="120" cy="120" r="108"/>
+          <circle id="ring-fg" cx="120" cy="120" r="108"
+                  style="transform-origin:center;transform:rotate(-90deg)"/>
+        </svg>
+        <div class="t-countdown" id="t-countdown">—</div>
+      </div>
+      <div class="t-next" id="t-next"></div>
+      <div class="round-dots" id="round-dots"></div>
+    </div>
+    <div class="timer-controls">
+      <button class="btn-skip" onclick="skipPhase()" title="Skip phase">⏭</button>
+      <button class="btn-pause" id="pause-btn" onclick="togglePause()">⏸</button>
+      <div style="width:52px"></div><!-- spacer -->
+    </div>
+  </div>
+  <!-- Done overlay (hidden until workout finishes) -->
+  <div class="done-overlay" id="done-overlay" style="display:none">
+    <div class="di">🏆</div>
+    <h2>Done!</h2>
+    <p id="done-stats"></p>
+    <button class="btn btn-primary" onclick="showHome()">Back to Workouts</button>
+  </div>
+</div>
+
+<script>
+// ─── Phase theme colours ──────────────────────────────────────────────────────
+const PHASE_THEME = {
+  warmup: { bg:'rgba(20,40,90,.95)',  ring:'#4488ff', pause:'#4488ff' },
+  round:  { bg:'rgba(90,15,15,.95)',  ring:'#ff4444', pause:'#ff4444' },
+  rest:   { bg:'rgba(10,60,25,.95)',  ring:'#33cc55', pause:'#33cc55' },
+};
+
+// ─── Storage ─────────────────────────────────────────────────────────────────
+function loadWorkouts(){
+  try{return JSON.parse(localStorage.getItem('hiit_wk')||'[]')}catch{return[]}
+}
+function saveWorkouts(a){localStorage.setItem('hiit_wk',JSON.stringify(a))}
+function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+// ─── Views ───────────────────────────────────────────────────────────────────
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function showHome(){stopTimer();renderHome();showView('home-view')}
+
+// ─── Home ─────────────────────────────────────────────────────────────────────
+function renderHome(){
+  const wks=loadWorkouts();
+  const list=document.getElementById('workout-list');
+  list.querySelectorAll('.workout-card').forEach(c=>c.remove());
+  document.getElementById('empty-state').style.display=wks.length?'none':'flex';
+  wks.forEach(w=>{
+    const totalSec=w.warmup+w.rounds*w.roundDur+Math.max(0,w.rounds-1)*w.rest;
+    const card=document.createElement('div');
+    card.className='workout-card';
+    card.innerHTML=`
+      <div class="wc-info">
+        <h3>${esc(w.name)}</h3>
+        <p>${w.rounds} rds × ${fmt(w.roundDur)} work · ${fmt(w.rest)} rest · ~${fmt(totalSec)} total</p>
+      </div>
+      <div class="wc-actions">
+        <button class="btn btn-icon btn-secondary" onclick="showEdit('${w.id}')">✏️</button>
+        <button class="btn btn-icon btn-danger"    onclick="delWorkout('${w.id}')">🗑</button>
+        <button class="btn btn-primary"            onclick="startWorkout('${w.id}')">▶</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+// ─── Edit ─────────────────────────────────────────────────────────────────────
+function showEdit(id){
+  const w=id?loadWorkouts().find(x=>x.id===id):null;
+  document.getElementById('edit-id').value       = w?w.id:'';
+  document.getElementById('edit-title').textContent = w?'Edit Workout':'New Workout';
+  document.getElementById('edit-name').value     = w?w.name:'';
+  document.getElementById('edit-warmup').value   = w?w.warmup:60;
+  document.getElementById('edit-rounds').value   = w?w.rounds:8;
+  document.getElementById('edit-rounddur').value = w?w.roundDur:180;
+  document.getElementById('edit-rest').value     = w?w.rest:60;
+  updateSummary();
+  showView('edit-view');
+}
+
+['edit-warmup','edit-rounds','edit-rounddur','edit-rest','edit-name']
+  .forEach(id=>document.getElementById(id).addEventListener('input',updateSummary));
+
+function updateSummary(){
+  const wu  = Math.max(0,  parseInt(document.getElementById('edit-warmup').value)||0);
+  const rds = Math.max(1,  parseInt(document.getElementById('edit-rounds').value)||1);
+  const rd  = Math.max(5,  parseInt(document.getElementById('edit-rounddur').value)||60);
+  const rst = Math.max(0,  parseInt(document.getElementById('edit-rest').value)||0);
+  const tot = wu + rds*rd + Math.max(0,rds-1)*rst;
+  const lines=[
+    wu  ? `Warmup: ${fmt(wu)}`:'No warmup',
+    `${rds} rounds × ${fmt(rd)} work`,
+    rst ? `${fmt(rst)} rest between rounds`:'No rest between rounds',
+    `Total: ~${fmt(tot)}`
+  ];
+  document.getElementById('edit-summary').innerHTML=lines.join('<br>');
+}
+
+function saveWorkout(){
+  const name=document.getElementById('edit-name').value.trim();
+  if(!name){alert('Please give this workout a name.');return;}
+  const id  = document.getElementById('edit-id').value||genId();
+  const wu  = Math.max(0, parseInt(document.getElementById('edit-warmup').value)||0);
+  const rds = Math.max(1, parseInt(document.getElementById('edit-rounds').value)||1);
+  const rd  = Math.max(5, parseInt(document.getElementById('edit-rounddur').value)||60);
+  const rst = Math.max(0, parseInt(document.getElementById('edit-rest').value)||0);
+  const wks=loadWorkouts();
+  const obj={id,name,warmup:wu,rounds:rds,roundDur:rd,rest:rst};
+  const i=wks.findIndex(w=>w.id===id);
+  if(i>=0)wks[i]=obj; else wks.push(obj);
+  saveWorkouts(wks);
+  showHome();
+}
+
+function delWorkout(id){
+  if(!confirm('Delete this workout?'))return;
+  saveWorkouts(loadWorkouts().filter(w=>w.id!==id));
+  renderHome();
+}
+
+// ─── Audio (Web Audio API — no files needed) ──────────────────────────────────
+let _actx=null;
+function audio(){
+  if(!_actx)_actx=new(window.AudioContext||window.webkitAudioContext)();
+  if(_actx.state==='suspended')_actx.resume();
+  return _actx;
+}
+function beep(freq,dur,vol=0.55,type='sine'){
+  try{
+    const ctx=audio(),o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.type=type;o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
+    o.start();o.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+function beepCountdown() { beep(1047,0.1,0.4) }          // C6 — short tick
+function beepGo()        { beep(880,0.25); setTimeout(()=>beep(880,0.35),280) } // two hits
+function beepRest()      { beep(330,0.5,0.5) }            // low warm tone
+function beepDone(){
+  [[523,0],[659,200],[784,400],[1047,650]].forEach(([f,t])=>
+    setTimeout(()=>beep(f,0.4,0.5),t));
+}
+
+// ─── Wake Lock ────────────────────────────────────────────────────────────────
+let _wl=null;
+async function acquireWL(){
+  try{if('wakeLock' in navigator)_wl=await navigator.wakeLock.request('screen')}catch(e){}
+}
+function releaseWL(){if(_wl){_wl.release().catch(()=>{});_wl=null;}}
+
+// ─── Timer state ─────────────────────────────────────────────────────────────
+let _tick=null, _s=null;
+
+function startWorkout(id){
+  const w=loadWorkouts().find(x=>x.id===id);
+  if(!w)return;
+  // Unlock audio context on user gesture
+  audio();
+
+  const firstPhase = w.warmup>0?'warmup':'round';
+  const firstDur   = w.warmup>0?w.warmup:w.roundDur;
+
+  _s={
+    w,
+    phase: firstPhase,
+    round: 1,
+    timeLeft: firstDur,
+    phaseDur: firstDur,
+    paused: false,
+  };
+
+  // Build round dots
+  const dots=document.getElementById('round-dots');
+  dots.innerHTML='';
+  for(let i=0;i<w.rounds;i++){
+    const d=document.createElement('div');
+    d.className='rd'+(i===0&&firstPhase==='round'?' active':'');
+    d.id='rd'+i;
+    dots.appendChild(d);
+  }
+
+  document.getElementById('t-name').textContent=w.name;
+  document.getElementById('done-overlay').style.display='none';
+  document.getElementById('pause-btn').textContent='⏸';
+  document.getElementById('pause-btn').classList.remove('paused');
+  acquireWL();
+  showView('timer-view');
+  renderTimerUI();
+  if(firstPhase==='round') beepGo();
+  _tick=setInterval(tickTimer,1000);
+}
+
+function tickTimer(){
+  if(!_s||_s.paused)return;
+  // Countdown beeps at 3, 2, 1 seconds left
+  if(_s.timeLeft>0&&_s.timeLeft<=3) beepCountdown();
+  _s.timeLeft--;
+  if(_s.timeLeft<=0) advancePhase();
+  else renderTimerUI();
+}
+
+function advancePhase(){
+  const s=_s, w=s.w;
+  if(s.phase==='warmup'){
+    s.phase='round'; s.round=1;
+    s.timeLeft=s.phaseDur=w.roundDur;
+    dotSet(0,'active');
+    beepGo();
+  } else if(s.phase==='round'){
+    dotSet(s.round-1,'done');
+    if(s.round>=w.rounds){
+      // Finished!
+      clearInterval(_tick);_tick=null;
+      releaseWL();
+      beepDone();
+      showDone();
+      return;
+    } else if(w.rest>0){
+      s.phase='rest';
+      s.timeLeft=s.phaseDur=w.rest;
+      beepRest();
+    } else {
+      s.round++;
+      s.timeLeft=s.phaseDur=w.roundDur;
+      dotSet(s.round-1,'active');
+      beepGo();
+    }
+  } else if(s.phase==='rest'){
+    s.round++;
+    s.phase='round';
+    s.timeLeft=s.phaseDur=w.roundDur;
+    dotSet(s.round-1,'active');
+    beepGo();
+  }
+  renderTimerUI();
+}
+
+function skipPhase(){
+  if(!_s||_s.phase==='done')return;
+  _s.timeLeft=0;
+  advancePhase();
+}
+
+function dotSet(idx,cls){
+  const d=document.getElementById('rd'+idx);
+  if(d)d.className='rd '+(cls==='done'?'done':cls==='active'?'active':'');
+}
+
+function renderTimerUI(){
+  const s=_s; if(!s)return;
+  const w=s.w;
+  const theme=PHASE_THEME[s.phase]||PHASE_THEME.round;
+
+  // Background
+  document.getElementById('timer-bg').style.background=theme.bg;
+
+  // Phase label
+  const pLabels={warmup:'WARM UP',round:'ROUND',rest:'REST'};
+  document.getElementById('t-phase').textContent=pLabels[s.phase]||s.phase.toUpperCase();
+
+  // Round info
+  let rinfo='';
+  if(s.phase==='round')      rinfo=`Round ${s.round} of ${w.rounds}`;
+  else if(s.phase==='rest')  rinfo=`Round ${s.round} of ${w.rounds} up next`;
+  else if(s.phase==='warmup')rinfo=`${w.rounds} rounds × ${fmt(w.roundDur)}`;
+  document.getElementById('t-round').textContent=rinfo;
+
+  // Countdown
+  document.getElementById('t-countdown').textContent=fmtTime(s.timeLeft);
+
+  // Next-up hint
+  let nxt='';
+  if(s.timeLeft<=10&&s.timeLeft>0){
+    if(s.phase==='warmup')     nxt=`Round 1 of ${w.rounds} starting…`;
+    else if(s.phase==='round'&&s.round<w.rounds) nxt=w.rest>0?`Rest ${fmt(w.rest)} coming…`:`Round ${s.round+1} coming…`;
+    else if(s.phase==='round'&&s.round===w.rounds) nxt='Last round — finish strong!';
+    else if(s.phase==='rest')  nxt=`Round ${s.round+1} of ${w.rounds} starting…`;
+  }
+  document.getElementById('t-next').textContent=nxt;
+
+  // Progress ring
+  const R=108, C=2*Math.PI*R;
+  const pct=s.phaseDur>0?s.timeLeft/s.phaseDur:0;
+  const fg=document.getElementById('ring-fg');
+  fg.style.strokeDasharray=C;
+  fg.style.strokeDashoffset=C*(1-pct);
+  fg.style.stroke=theme.ring;
+
+  // Pause button colour
+  document.getElementById('pause-btn').style.background=theme.pause;
+  document.getElementById('pause-btn').style.boxShadow=`0 4px 20px ${theme.ring}55`;
+}
+
+function togglePause(){
+  if(!_s)return;
+  _s.paused=!_s.paused;
+  const btn=document.getElementById('pause-btn');
+  if(_s.paused){btn.textContent='▶';btn.style.opacity='0.7';}
+  else{btn.textContent='⏸';btn.style.opacity='1';audio().resume();}
+}
+
+function confirmStop(){
+  if(confirm('Stop this workout?')) showHome();
+}
+
+function stopTimer(){
+  if(_tick){clearInterval(_tick);_tick=null;}
+  releaseWL();
+  _s=null;
+}
+
+function showDone(){
+  const s=_s, w=s?s.w:null;
+  const ov=document.getElementById('done-overlay');
+  if(w){
+    const totalSec=w.warmup+w.rounds*w.roundDur+Math.max(0,w.rounds-1)*w.rest;
+    document.getElementById('done-stats').textContent=
+      `${w.rounds} rounds complete\n${fmt(w.roundDur)} work · ${fmt(w.rest)} rest\n~${fmt(totalSec)} workout`;
+  }
+  ov.style.display='flex';
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function fmtTime(s){
+  const m=Math.floor(s/60),sec=s%60;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+function fmt(s){
+  if(!s)return '0s';
+  const m=Math.floor(s/60),sec=s%60;
+  if(m&&sec)return `${m}m${sec}s`;
+  return m?`${m}m`:`${sec}s`;
+}
+function esc(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+renderHome();
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
