@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0d0d0d">
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <title>HIIT Timer</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -141,13 +141,13 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
       <p>No workouts yet.<br>Tap <strong>+</strong> to create your first.</p>
     </div>
   </div>
-  <button class="fab" onclick="showEdit(null)" aria-label="New workout">+</button>
+  <button class="fab" id="fab-new" aria-label="New workout">+</button>
 </div>
 
 <!-- ══ EDIT ══════════════════════════════════════════════════════════════ -->
 <div id="edit-view" class="view">
   <div class="edit-header">
-    <button class="back-btn" onclick="showHome()">‹</button>
+    <button class="back-btn" id="edit-back-btn">‹</button>
     <h2 id="edit-title">New Workout</h2>
   </div>
   <div class="edit-body">
@@ -185,8 +185,8 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
     </div>
   </div>
   <div class="edit-footer">
-    <button class="btn btn-secondary" onclick="showHome()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveWorkout()">Save Workout</button>
+    <button class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
+    <button class="btn btn-primary" id="edit-save-btn">Save Workout</button>
   </div>
 </div>
 
@@ -196,7 +196,7 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
   <div class="timer-content">
     <div class="timer-topbar">
       <span class="timer-wname" id="t-name"></span>
-      <button class="stop-btn" onclick="confirmStop()">■ Stop</button>
+      <button class="stop-btn" id="stop-btn">■ Stop</button>
     </div>
     <div class="timer-main">
       <div class="t-phase" id="t-phase">WARM UP</div>
@@ -213,8 +213,8 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
       <div class="round-dots" id="round-dots"></div>
     </div>
     <div class="timer-controls">
-      <button class="btn-skip" onclick="skipPhase()" title="Skip phase">⏭</button>
-      <button class="btn-pause" id="pause-btn" onclick="togglePause()">⏸</button>
+      <button class="btn-skip" id="skip-btn" title="Skip phase">⏭</button>
+      <button class="btn-pause" id="pause-btn">⏸</button>
       <div style="width:52px"></div><!-- spacer -->
     </div>
   </div>
@@ -223,7 +223,7 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
     <div class="di">🏆</div>
     <h2>Done!</h2>
     <p id="done-stats"></p>
-    <button class="btn btn-primary" onclick="showHome()">Back to Workouts</button>
+    <button class="btn btn-primary" id="done-home-btn">Back to Workouts</button>
   </div>
 </div>
 
@@ -265,9 +265,9 @@ function renderHome(){
         <p>${w.rounds} rds × ${fmt(w.roundDur)} work · ${fmt(w.rest)} rest · ~${fmt(totalSec)} total</p>
       </div>
       <div class="wc-actions">
-        <button class="btn btn-icon btn-secondary" onclick="showEdit('${w.id}')">✏️</button>
-        <button class="btn btn-icon btn-danger"    onclick="delWorkout('${w.id}')">🗑</button>
-        <button class="btn btn-primary"            onclick="startWorkout('${w.id}')">▶</button>
+        <button class="btn btn-icon btn-secondary" data-action="edit"  data-id="${w.id}">✏️</button>
+        <button class="btn btn-icon btn-danger"    data-action="del"   data-id="${w.id}">🗑</button>
+        <button class="btn btn-primary"            data-action="start" data-id="${w.id}">▶</button>
       </div>`;
     list.appendChild(card);
   });
@@ -547,9 +547,39 @@ function esc(s){
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+function setupEventListeners(){
+  // Home
+  document.getElementById('fab-new').addEventListener('click', () => showEdit(null));
+
+  // Edit view — static buttons
+  document.getElementById('edit-back-btn').addEventListener('click', showHome);
+  document.getElementById('edit-cancel-btn').addEventListener('click', showHome);
+  document.getElementById('edit-save-btn').addEventListener('click', saveWorkout);
+
+  // Timer view
+  document.getElementById('stop-btn').addEventListener('click', confirmStop);
+  document.getElementById('skip-btn').addEventListener('click', skipPhase);
+  document.getElementById('pause-btn').addEventListener('click', togglePause);
+
+  // Done overlay
+  document.getElementById('done-home-btn').addEventListener('click', showHome);
+
+  // Workout list — event delegation for dynamically generated cards
+  document.getElementById('workout-list').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const id     = btn.dataset.id;
+    if (action === 'edit')  showEdit(id);
+    else if (action === 'del')   delWorkout(id);
+    else if (action === 'start') startWorkout(id);
+  });
+}
+
+setupEventListeners();
 renderHome();
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
 }
 </script>
 </body>
