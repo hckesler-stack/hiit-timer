@@ -1,15 +1,18 @@
-const CACHE = 'hiit-v2';
+const CACHE = 'hiit-v3';
+const BASE = 'https://hckesler-stack.github.io/hiit-timer';
 const FILES = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/manifest.json',
+  BASE + '/icon-192.png',
+  BASE + '/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => c.addAll(FILES))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -21,15 +24,16 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Cache-first: always serve from cache, fall back to network
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(cached => {
-      return cached || fetch(e.request).then(resp => {
-        const clone = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return resp;
-      });
-    }).catch(() => caches.match('./index.html'))
+    caches.match(e.request, { ignoreSearch: true })
+      .then(cached => cached || fetch(e.request)
+        .then(resp => {
+          const clone = resp.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return resp;
+        })
+      )
+      .catch(() => caches.match(BASE + '/index.html'))
   );
 });
