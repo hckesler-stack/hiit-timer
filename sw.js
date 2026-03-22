@@ -1,4 +1,4 @@
-const CACHE = 'hiit-v3';
+const CACHE = 'hiit-v4';
 const BASE = 'https://hckesler-stack.github.io/hiit-timer';
 const FILES = [
   BASE + '/',

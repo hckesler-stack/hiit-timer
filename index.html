@@ -125,6 +125,30 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
 .done-overlay h2{font-size:34px;font-weight:900;color:#ffcc44}
 .done-overlay p{font-size:16px;color:#666;line-height:1.6}
 .done-overlay .btn{margin-top:8px;padding:16px 40px;font-size:17px}
+
+/* ── Settings ── */
+.settings-btn{background:none;border:none;color:#666;font-size:22px;
+  cursor:pointer;padding:4px 8px;touch-action:manipulation;line-height:1}
+.settings-btn:active{color:#ff4444}
+.settings-panel{display:none;position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,.7);align-items:flex-end}
+.settings-panel.open{display:flex}
+.settings-sheet{background:#1a1a1a;border-radius:18px 18px 0 0;
+  padding:24px 20px 40px;width:100%;display:flex;flex-direction:column;gap:20px}
+.settings-sheet h3{font-size:16px;font-weight:700;color:#ff4444;text-align:center;margin-bottom:4px}
+.setting-row{display:flex;flex-direction:column;gap:8px}
+.setting-row label{font-size:11px;color:#666;text-transform:uppercase;
+  letter-spacing:.8px;font-weight:600}
+.vol-row{display:flex;align-items:center;gap:12px}
+.vol-row span{font-size:14px;color:#aaa;min-width:36px;text-align:right}
+input[type=range]{flex:1;accent-color:#ff4444;height:6px}
+.sound-options{display:flex;gap:10px}
+.sound-opt{flex:1;background:#2a2a2a;border:2px solid #333;border-radius:10px;
+  padding:10px 6px;text-align:center;cursor:pointer;touch-action:manipulation;
+  font-size:13px;color:#aaa;transition:all .2s}
+.sound-opt.selected{border-color:#ff4444;color:#fff;background:#2a0808}
+.settings-close{background:#ff4444;color:#fff;border:none;border-radius:10px;
+  padding:14px;font-size:15px;font-weight:700;cursor:pointer;touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -133,7 +157,7 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
 <div id="home-view" class="view active">
   <div class="home-header">
     <h1>⚡ HIIT Timer</h1>
-    <span>Boxing · Sprints · HIIT</span>
+    <button class="settings-btn" id="settings-btn" aria-label="Settings">⚙️</button>
   </div>
   <div class="workout-list" id="workout-list">
     <div class="empty-state" id="empty-state">
@@ -142,6 +166,30 @@ html,body{height:100%;overflow:hidden;background:#0d0d0d;color:#f0f0f0;
     </div>
   </div>
   <button class="fab" id="fab-new" aria-label="New workout">+</button>
+</div>
+
+<!-- ══ SETTINGS ═══════════════════════════════════════════════════════════ -->
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-sheet">
+    <h3>⚙️ Sound Settings</h3>
+    <div class="setting-row">
+      <label>Volume</label>
+      <div class="vol-row">
+        <span>🔇</span>
+        <input type="range" id="vol-slider" min="0" max="100" value="70">
+        <span id="vol-pct">70%</span>
+      </div>
+    </div>
+    <div class="setting-row">
+      <label>Sound Style</label>
+      <div class="sound-options">
+        <div class="sound-opt selected" data-style="beep">🔔<br>Beep</div>
+        <div class="sound-opt" data-style="bell">🎵<br>Bell</div>
+        <div class="sound-opt" data-style="soft">🎶<br>Soft</div>
+      </div>
+    </div>
+    <button class="settings-close" id="settings-close-btn">Done</button>
+  </div>
 </div>
 
 <!-- ══ EDIT ══════════════════════════════════════════════════════════════ -->
@@ -327,6 +375,13 @@ function delWorkout(id){
   renderHome();
 }
 
+// ─── Settings ─────────────────────────────────────────────────────────────────
+function loadSettings(){
+  try{return JSON.parse(localStorage.getItem('hiit_settings')||'{}')}catch{return{}}
+}
+function saveSettings(s){localStorage.setItem('hiit_settings',JSON.stringify(s))}
+let _settings = Object.assign({volume:70, style:'beep'}, loadSettings());
+
 // ─── Audio (Web Audio API — no files needed) ──────────────────────────────────
 let _actx=null;
 function audio(){
@@ -334,22 +389,73 @@ function audio(){
   if(_actx.state==='suspended')_actx.resume();
   return _actx;
 }
+
+// Sound style definitions: { type, freqMult, dur }
+const STYLES={
+  beep:{ type:'sine',   freqMult:1.0, durMult:1.0 },
+  bell:{ type:'triangle', freqMult:1.0, durMult:1.8 },
+  soft:{ type:'sine',   freqMult:0.5, durMult:1.4 },
+};
+
 function beep(freq,dur,vol=0.55,type='sine'){
+  const masterVol = _settings.volume / 100;
+  if(masterVol === 0) return;
+  const st = STYLES[_settings.style] || STYLES.beep;
+  const actualType = (type !== 'sine') ? type : st.type;
+  const actualFreq = freq * st.freqMult;
+  const actualDur  = dur  * st.durMult;
+  const actualVol  = vol  * masterVol;
   try{
     const ctx=audio(),o=ctx.createOscillator(),g=ctx.createGain();
     o.connect(g);g.connect(ctx.destination);
-    o.type=type;o.frequency.value=freq;
-    g.gain.setValueAtTime(vol,ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+dur);
-    o.start();o.stop(ctx.currentTime+dur);
+    o.type=actualType;o.frequency.value=actualFreq;
+    g.gain.setValueAtTime(actualVol,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+actualDur);
+    o.start();o.stop(ctx.currentTime+actualDur);
   }catch(e){}
 }
-function beepCountdown() { beep(1047,0.1,0.4) }          // C6 — short tick
-function beepGo()        { beep(880,0.25); setTimeout(()=>beep(880,0.35),280) } // two hits
-function beepRest()      { beep(330,0.5,0.5) }            // low warm tone
+function beepCountdown() { beep(1047,0.1,0.4) }
+function beepGo()        { beep(880,0.25); setTimeout(()=>beep(880,0.35),280) }
+function beepRest()      { beep(330,0.5,0.5) }
 function beepDone(){
   [[523,0],[659,200],[784,400],[1047,650]].forEach(([f,t])=>
     setTimeout(()=>beep(f,0.4,0.5),t));
+}
+
+// ─── Settings UI ─────────────────────────────────────────────────────────────
+function openSettings(){
+  document.getElementById('vol-slider').value = _settings.volume;
+  document.getElementById('vol-pct').textContent = _settings.volume + '%';
+  document.querySelectorAll('.sound-opt').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.style === _settings.style);
+  });
+  document.getElementById('settings-panel').classList.add('open');
+}
+function closeSettings(){
+  document.getElementById('settings-panel').classList.remove('open');
+}
+function setupSettingsUI(){
+  document.getElementById('settings-btn').addEventListener('click', openSettings);
+  document.getElementById('settings-close-btn').addEventListener('click', closeSettings);
+  document.getElementById('settings-panel').addEventListener('click', e=>{
+    if(e.target === document.getElementById('settings-panel')) closeSettings();
+  });
+  document.getElementById('vol-slider').addEventListener('input', e=>{
+    const v = parseInt(e.target.value);
+    _settings.volume = v;
+    document.getElementById('vol-pct').textContent = v + '%';
+    saveSettings(_settings);
+    audio(); beep(880,0.15,0.6); // preview
+  });
+  document.querySelectorAll('.sound-opt').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      _settings.style = el.dataset.style;
+      saveSettings(_settings);
+      document.querySelectorAll('.sound-opt').forEach(o=>o.classList.remove('selected'));
+      el.classList.add('selected');
+      audio(); beepGo(); // preview
+    });
+  });
 }
 
 // ─── Wake Lock ────────────────────────────────────────────────────────────────
@@ -577,6 +683,7 @@ function setupEventListeners(){
 }
 
 setupEventListeners();
+setupSettingsUI();
 renderHome();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(()=>{});
