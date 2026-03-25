@@ -279,8 +279,8 @@ input[type=range]{flex:1;accent-color:#ff4444;height:6px}
 // ─── Phase theme colours ──────────────────────────────────────────────────────
 const PHASE_THEME = {
   warmup: { bg:'rgba(20,40,90,.95)',  ring:'#4488ff', pause:'#4488ff' },
-  round:  { bg:'rgba(90,15,15,.95)',  ring:'#ff4444', pause:'#ff4444' },
-  rest:   { bg:'rgba(10,60,25,.95)',  ring:'#33cc55', pause:'#33cc55' },
+  round:  { bg:'rgba(5,85,18,.97)',   ring:'#22ee55', pause:'#22ee55' },  // green = GO
+  rest:   { bg:'rgba(110,8,8,.97)',   ring:'#ff2222', pause:'#ff2222' },  // red = REST
 };
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
@@ -414,9 +414,11 @@ function beep(freq,dur,vol=0.55,type='sine'){
     o.start();o.stop(ctx.currentTime+actualDur);
   }catch(e){}
 }
-function beepCountdown() { beep(1047,0.1,0.4) }
-function beepGo()        { beep(880,0.25); setTimeout(()=>beep(880,0.35),280) }
-function beepRest()      { beep(330,0.5,0.5) }
+function beepCountdown()     { beep(1047,0.12,0.45) }  // high — counting to GO
+function beepCountdownStop() { beep(523,0.12,0.45)  }  // low  — counting to STOP
+function beepGo()        { beep(880,0.25); setTimeout(()=>beep(1047,0.35),280) }
+function beepStop()      { beep(440,0.4,0.5); setTimeout(()=>beep(330,0.5,0.5),320) }
+function beepRest()      { beepStop() }
 function beepDone(){
   [[523,0],[659,200],[784,400],[1047,650]].forEach(([f,t])=>
     setTimeout(()=>beep(f,0.4,0.5),t));
@@ -509,8 +511,11 @@ function startWorkout(id){
 
 function tickTimer(){
   if(!_s||_s.paused)return;
-  // Countdown beeps at 3, 2, 1 seconds left
-  if(_s.timeLeft>0&&_s.timeLeft<=3) beepCountdown();
+  // Countdown beeps at 3, 2, 1 seconds left — different tone for GO vs STOP
+  if(_s.timeLeft>0&&_s.timeLeft<=3){
+    if(_s.phase==='round') beepCountdownStop();
+    else beepCountdown();
+  }
   _s.timeLeft--;
   if(_s.timeLeft<=0) advancePhase();
   else renderTimerUI();
@@ -582,8 +587,9 @@ function renderTimerUI(){
   else if(s.phase==='warmup')rinfo=`${w.rounds} rounds × ${fmt(w.roundDur)}`;
   document.getElementById('t-round').textContent=rinfo;
 
-  // Countdown
-  document.getElementById('t-countdown').textContent=fmtTime(s.timeLeft);
+  // Countdown — show big digit "3 2 1" in last 3 seconds
+  document.getElementById('t-countdown').textContent =
+    (s.timeLeft > 0 && s.timeLeft <= 3) ? String(s.timeLeft) : fmtTime(s.timeLeft);
 
   // Next-up hint
   let nxt='';
